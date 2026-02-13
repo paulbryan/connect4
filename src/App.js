@@ -12,13 +12,16 @@ function App() {
   const [currentPlayer, setCurrentPlayer] = useState(PLAYER1);
   const [winner, setWinner] = useState(null);
   const [winningCells, setWinningCells] = useState([]);
+  const [isDraw, setIsDraw] = useState(false);
+  const [gameMode, setGameMode] = useState(null); // null = mode selection, 'player' = vs player, 'computer' = vs computer
+  const [isComputerThinking, setIsComputerThinking] = useState(false);
 
   function createEmptyBoard() {
     return Array(ROWS).fill(null).map(() => Array(COLS).fill(EMPTY));
   }
 
   function dropPiece(col) {
-    if (winner) return;
+    if (winner || isDraw || isComputerThinking) return;
 
     // Find the lowest empty row in the column
     let row = -1;
@@ -41,10 +44,26 @@ function App() {
     if (result) {
       setWinner(currentPlayer);
       setWinningCells(result);
+    } else if (isBoardFull(newBoard)) {
+      // Check for draw
+      setIsDraw(true);
     } else {
       // Switch player
-      setCurrentPlayer(currentPlayer === PLAYER1 ? PLAYER2 : PLAYER1);
+      const nextPlayer = currentPlayer === PLAYER1 ? PLAYER2 : PLAYER1;
+      setCurrentPlayer(nextPlayer);
+      
+      // If playing against computer and it's computer's turn
+      if (gameMode === 'computer' && nextPlayer === PLAYER2) {
+        setIsComputerThinking(true);
+        setTimeout(() => {
+          makeComputerMove(newBoard);
+        }, 500); // Slight delay to make it feel more natural
+      }
     }
+  }
+
+  function isBoardFull(board) {
+    return board[0].every(cell => cell !== EMPTY);
   }
 
   function checkWinner(board, row, col, player) {
@@ -78,15 +97,132 @@ function App() {
     return null;
   }
 
+  function getAvailableColumns(board) {
+    const available = [];
+    for (let col = 0; col < COLS; col++) {
+      if (board[0][col] === EMPTY) {
+        available.push(col);
+      }
+    }
+    return available;
+  }
+
+  function findLowestRow(board, col) {
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (board[r][col] === EMPTY) {
+        return r;
+      }
+    }
+    return -1;
+  }
+
+  function makeComputerMove(board) {
+    const availableCols = getAvailableColumns(board);
+    if (availableCols.length === 0) {
+      setIsComputerThinking(false);
+      return;
+    }
+
+    // Strategy: Try to win, block opponent, or pick best move
+    let bestCol = null;
+
+    // 1. Check if computer can win
+    for (const col of availableCols) {
+      const row = findLowestRow(board, col);
+      if (row !== -1) {
+        const testBoard = board.map(r => [...r]);
+        testBoard[row][col] = PLAYER2;
+        if (checkWinner(testBoard, row, col, PLAYER2)) {
+          bestCol = col;
+          break;
+        }
+      }
+    }
+
+    // 2. Check if need to block opponent
+    if (bestCol === null) {
+      for (const col of availableCols) {
+        const row = findLowestRow(board, col);
+        if (row !== -1) {
+          const testBoard = board.map(r => [...r]);
+          testBoard[row][col] = PLAYER1;
+          if (checkWinner(testBoard, row, col, PLAYER1)) {
+            bestCol = col;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Pick center or random column
+    if (bestCol === null) {
+      const centerCol = Math.floor(COLS / 2);
+      if (availableCols.includes(centerCol)) {
+        bestCol = centerCol;
+      } else {
+        bestCol = availableCols[Math.floor(Math.random() * availableCols.length)];
+      }
+    }
+
+    // Make the move
+    const row = findLowestRow(board, bestCol);
+    if (row !== -1) {
+      const newBoard = board.map(r => [...r]);
+      newBoard[row][bestCol] = PLAYER2;
+      setBoard(newBoard);
+
+      const result = checkWinner(newBoard, row, bestCol, PLAYER2);
+      if (result) {
+        setWinner(PLAYER2);
+        setWinningCells(result);
+      } else if (isBoardFull(newBoard)) {
+        setIsDraw(true);
+      } else {
+        setCurrentPlayer(PLAYER1);
+      }
+    }
+    
+    setIsComputerThinking(false);
+  }
+
   function resetGame() {
     setBoard(createEmptyBoard());
     setCurrentPlayer(PLAYER1);
     setWinner(null);
     setWinningCells([]);
+    setIsDraw(false);
+    setIsComputerThinking(false);
+  }
+
+  function selectGameMode(mode) {
+    setGameMode(mode);
+    resetGame();
+  }
+
+  function backToMenu() {
+    setGameMode(null);
+    resetGame();
   }
 
   function isCellWinning(row, col) {
     return winningCells.some(([r, c]) => r === row && c === col);
+  }
+
+  if (gameMode === null) {
+    return (
+      <div className="App">
+        <h1>Connect 4</h1>
+        <div className="menu">
+          <h2>Select Game Mode</h2>
+          <button className="mode-button" onClick={() => selectGameMode('player')}>
+            Play vs Player
+          </button>
+          <button className="mode-button" onClick={() => selectGameMode('computer')}>
+            Play vs Computer
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -95,9 +231,16 @@ function App() {
       <div className="game-info">
         {winner ? (
           <h2>Winner: {winner === PLAYER1 ? 'Red' : 'Yellow'}!</h2>
+        ) : isDraw ? (
+          <h2>It's a Draw!</h2>
+        ) : isComputerThinking ? (
+          <h2>Computer is thinking...</h2>
         ) : (
           <h2>Current Player: {currentPlayer === PLAYER1 ? 'Red' : 'Yellow'}</h2>
         )}
+        <p className="game-mode-label">
+          {gameMode === 'computer' ? 'Playing vs Computer' : 'Playing vs Player'}
+        </p>
       </div>
       <div className="board">
         {board.map((row, rowIndex) => (
@@ -114,7 +257,10 @@ function App() {
           </div>
         ))}
       </div>
-      <button className="reset-button" onClick={resetGame}>New Game</button>
+      <div className="button-group">
+        <button className="reset-button" onClick={resetGame}>New Game</button>
+        <button className="menu-button" onClick={backToMenu}>Change Mode</button>
+      </div>
     </div>
   );
 }
