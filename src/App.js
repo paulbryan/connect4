@@ -122,6 +122,101 @@ function App() {
     return -1;
   }
 
+  function countSequence(board, row, col, player, dr, dc, length) {
+    // Count consecutive pieces in a direction
+    let count = 0;
+    let r = row;
+    let c = col;
+    while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player && count < length) {
+      count++;
+      r += dr;
+      c += dc;
+    }
+    return count;
+  }
+
+  function evaluatePosition(board, row, col, player) {
+    // Evaluate how good a position is for creating threats
+    let score = 0;
+    const directions = [
+      [0, 1],   // horizontal
+      [1, 0],   // vertical
+      [1, 1],   // diagonal down-right
+      [1, -1]   // diagonal down-left
+    ];
+
+    for (const [dr, dc] of directions) {
+      // Count pieces in both directions
+      const forward = countSequence(board, row + dr, col + dc, player, dr, dc, 3);
+      const backward = countSequence(board, row - dr, col - dc, player, -dr, -dc, 3);
+      const total = forward + backward;
+
+      // Score based on how many in a row (including this position)
+      if (total >= 3) score += 100; // 3 in a row with this move
+      else if (total === 2) score += 10; // 2 in a row with this move
+      else if (total === 1) score += 1; // 1 in a row with this move
+    }
+
+    return score;
+  }
+
+  function scoreMove(board, col, player, opponent) {
+    const row = findLowestRow(board, col);
+    if (row === -1) return -10000; // Invalid move
+
+    const testBoard = board.map(r => [...r]);
+    testBoard[row][col] = player;
+
+    let score = 0;
+
+    // 1. Winning move - highest priority
+    if (checkWinner(testBoard, row, col, player)) {
+      return 100000;
+    }
+
+    // 2. Check if opponent can win next turn (after this move)
+    const opponentBoard = testBoard.map(r => [...r]);
+    for (let c = 0; c < COLS; c++) {
+      const opponentRow = findLowestRow(opponentBoard, c);
+      if (opponentRow !== -1) {
+        const testOppBoard = opponentBoard.map(r => [...r]);
+        testOppBoard[opponentRow][c] = opponent;
+        if (checkWinner(testOppBoard, opponentRow, c, opponent)) {
+          // This move allows opponent to win next turn - very bad
+          score -= 50000;
+        }
+      }
+    }
+
+    // 3. Block opponent's immediate winning move
+    const blockBoard = board.map(r => [...r]);
+    blockBoard[row][col] = opponent;
+    if (checkWinner(blockBoard, row, col, opponent)) {
+      score += 50000; // Must block
+    }
+
+    // 4. Evaluate offensive potential (creating threats)
+    score += evaluatePosition(testBoard, row, col, player) * 100;
+
+    // 5. Evaluate defensive consideration (blocking opponent threats)
+    score += evaluatePosition(board, row, col, opponent) * 50;
+
+    // 6. Position value - prefer center columns
+    const distanceFromCenter = Math.abs(col - Math.floor(COLS / 2));
+    score += (4 - distanceFromCenter) * 10;
+
+    // 7. Prefer lower rows (building foundation)
+    score += (ROWS - row) * 2;
+
+    // 8. Avoid edges early in game
+    const piecesOnBoard = board.flat().filter(cell => cell !== EMPTY).length;
+    if (piecesOnBoard < 8 && (col === 0 || col === COLS - 1)) {
+      score -= 20;
+    }
+
+    return score;
+  }
+
   function makeComputerMove(board) {
     const availableCols = getAvailableColumns(board);
     if (availableCols.length === 0) {
@@ -129,46 +224,23 @@ function App() {
       return;
     }
 
-    // Strategy: Try to win, block opponent, or pick best move
-    let bestCol = null;
+    // Score all available moves
+    let bestScore = -Infinity;
+    let bestCols = [];
 
-    // 1. Check if computer can win
     for (const col of availableCols) {
-      const row = findLowestRow(board, col);
-      if (row !== -1) {
-        const testBoard = board.map(r => [...r]);
-        testBoard[row][col] = PLAYER2;
-        if (checkWinner(testBoard, row, col, PLAYER2)) {
-          bestCol = col;
-          break;
-        }
+      const score = scoreMove(board, col, PLAYER2, PLAYER1);
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestCols = [col];
+      } else if (score === bestScore) {
+        bestCols.push(col);
       }
     }
 
-    // 2. Check if need to block opponent
-    if (bestCol === null) {
-      for (const col of availableCols) {
-        const row = findLowestRow(board, col);
-        if (row !== -1) {
-          const testBoard = board.map(r => [...r]);
-          testBoard[row][col] = PLAYER1;
-          if (checkWinner(testBoard, row, col, PLAYER1)) {
-            bestCol = col;
-            break;
-          }
-        }
-      }
-    }
-
-    // 3. Pick center or random column
-    if (bestCol === null) {
-      const centerCol = Math.floor(COLS / 2);
-      if (availableCols.includes(centerCol)) {
-        bestCol = centerCol;
-      } else {
-        bestCol = availableCols[Math.floor(Math.random() * availableCols.length)];
-      }
-    }
+    // If multiple moves have the same best score, pick randomly among them
+    const bestCol = bestCols[Math.floor(Math.random() * bestCols.length)];
 
     // Make the move
     const row = findLowestRow(board, bestCol);
