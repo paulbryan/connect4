@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import './App.css';
 
 const ROWS = 6;
@@ -15,13 +15,17 @@ function App() {
   const [isDraw, setIsDraw] = useState(false);
   const [gameMode, setGameMode] = useState(null); // null = mode selection, 'player' = vs player, 'computer' = vs computer
   const [isComputerThinking, setIsComputerThinking] = useState(false);
+  const computerTimeoutRef = useRef(null);
 
   function createEmptyBoard() {
     return Array(ROWS).fill(null).map(() => Array(COLS).fill(EMPTY));
   }
 
   function dropPiece(col) {
-    if (winner || isDraw || isComputerThinking) return;
+    if (winner || isDraw) return;
+    
+    // In computer mode, only allow human player to make moves
+    if (gameMode === 'computer' && currentPlayer === PLAYER2) return;
 
     // Find the lowest empty row in the column
     let row = -1;
@@ -44,9 +48,11 @@ function App() {
     if (result) {
       setWinner(currentPlayer);
       setWinningCells(result);
+      setIsComputerThinking(false);
     } else if (isBoardFull(newBoard)) {
       // Check for draw
       setIsDraw(true);
+      setIsComputerThinking(false);
     } else {
       // Switch player
       const nextPlayer = currentPlayer === PLAYER1 ? PLAYER2 : PLAYER1;
@@ -55,7 +61,7 @@ function App() {
       // If playing against computer and it's computer's turn
       if (gameMode === 'computer' && nextPlayer === PLAYER2) {
         setIsComputerThinking(true);
-        setTimeout(() => {
+        computerTimeoutRef.current = setTimeout(() => {
           makeComputerMove(newBoard);
         }, 500); // Slight delay to make it feel more natural
       }
@@ -175,17 +181,26 @@ function App() {
       if (result) {
         setWinner(PLAYER2);
         setWinningCells(result);
+        setIsComputerThinking(false);
       } else if (isBoardFull(newBoard)) {
         setIsDraw(true);
+        setIsComputerThinking(false);
       } else {
         setCurrentPlayer(PLAYER1);
+        setIsComputerThinking(false);
       }
+    } else {
+      setIsComputerThinking(false);
     }
-    
-    setIsComputerThinking(false);
   }
 
   function resetGame() {
+    // Clear any pending computer move
+    if (computerTimeoutRef.current) {
+      clearTimeout(computerTimeoutRef.current);
+      computerTimeoutRef.current = null;
+    }
+    
     setBoard(createEmptyBoard());
     setCurrentPlayer(PLAYER1);
     setWinner(null);
@@ -200,6 +215,12 @@ function App() {
   }
 
   function backToMenu() {
+    // Clear any pending computer move
+    if (computerTimeoutRef.current) {
+      clearTimeout(computerTimeoutRef.current);
+      computerTimeoutRef.current = null;
+    }
+    
     setGameMode(null);
     resetGame();
   }
