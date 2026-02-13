@@ -152,9 +152,10 @@ function App() {
       const total = forward + backward;
 
       // Score based on how many in a row (including this position)
-      if (total >= 3) score += 100; // 3 in a row with this move
-      else if (total === 2) score += 10; // 2 in a row with this move
-      else if (total === 1) score += 1; // 1 in a row with this move
+      // total is the count of adjacent pieces, +1 for this position
+      if (total >= 2) score += 100; // Creates 3+ in a row with this move
+      else if (total === 1) score += 10; // Creates 2 in a row with this move
+      else if (total === 0) score += 1; // Single piece
     }
 
     return score;
@@ -199,7 +200,8 @@ function App() {
     score += evaluatePosition(testBoard, row, col, player) * 100;
 
     // 5. Evaluate defensive consideration (blocking opponent threats)
-    score += evaluatePosition(board, row, col, opponent) * 50;
+    // Use testBoard to see how this move affects opponent's potential
+    score += evaluatePosition(testBoard, row, col, opponent) * 50;
 
     // 6. Position value - prefer center columns
     const distanceFromCenter = Math.abs(col - Math.floor(COLS / 2));
