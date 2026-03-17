@@ -40,10 +40,10 @@ A classic Connect 4 game built with React.
 npm install
 
 # Start the development server
-npm start
+npm run dev
 ```
 
-The game will open in your browser at `http://localhost:3000`
+The game will open in your browser at `http://localhost:5173`
 
 ### Building for Production
 
@@ -66,8 +66,8 @@ npm run build
 ## Technologies Used
 
 - React 19
+- Vite
 - CSS3 (with animations)
-- Create React App
 
 ## License
 

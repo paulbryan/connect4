@@ -23,7 +23,7 @@ function App() {
 
   function dropPiece(col) {
     if (winner || isDraw) return;
-    
+
     // In computer mode, only allow human player to make moves
     if (gameMode === 'computer' && currentPlayer === PLAYER2) return;
 
@@ -57,7 +57,7 @@ function App() {
       // Switch player
       const nextPlayer = currentPlayer === PLAYER1 ? PLAYER2 : PLAYER1;
       setCurrentPlayer(nextPlayer);
-      
+
       // If playing against computer and it's computer's turn
       if (gameMode === 'computer' && nextPlayer === PLAYER2) {
         setIsComputerThinking(true);
@@ -83,7 +83,7 @@ function App() {
 
     for (const direction of directions) {
       const cells = [[row, col]];
-      
+
       // Check both directions
       for (const [dr, dc] of direction) {
         let r = row + dr;
@@ -232,7 +232,7 @@ function App() {
 
     for (const col of availableCols) {
       const score = scoreMove(board, col, PLAYER2, PLAYER1);
-      
+
       if (score > bestScore) {
         bestScore = score;
         bestCols = [col];
@@ -274,7 +274,7 @@ function App() {
       clearTimeout(computerTimeoutRef.current);
       computerTimeoutRef.current = null;
     }
-    
+
     setBoard(createEmptyBoard());
     setCurrentPlayer(PLAYER1);
     setWinner(null);
@@ -294,7 +294,7 @@ function App() {
       clearTimeout(computerTimeoutRef.current);
       computerTimeoutRef.current = null;
     }
-    
+
     setGameMode(null);
     resetGame();
   }
